@@ -63,6 +63,24 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
+        # Third matrix axis: optional pin for apache-airflow-providers-standard.
+        #
+        # Purpose: regression coverage for issue #679. On Airflow 2.x with
+        # `apache-airflow-providers-standard==1.9.1` installed, the core and
+        # providers.standard PythonOperator classes diverge — dagbuilder must
+        # handle both. To exercise that combination in CI we need a job where
+        # providers-standard is pinned to a specific version.
+        #
+        # We run this through the same `Run-Unit-Tests` job, not a dedicated
+        # one — the value flows through to `scripts/test/pre-install-airflow.sh`
+        # (3rd arg) via a Hatch matrix variable of the same name in
+        # pyproject.toml. Empty string here = the base-matrix default; every
+        # base combination runs without an explicit pin so providers-standard
+        # is resolved from Airflow's constraints file as usual. The single
+        # `include:` row below adds one extra Run-Unit-Tests job that pins it
+        # to 1.9.1, giving us the regression coverage without multiplying the
+        # matrix across every Python/Airflow combination.
+        providers-standard-version: [""]
         exclude:
           - python-version: "3.13"
             airflow-version: "2.9"
@@ -82,11 +100,30 @@ jobs:
             airflow-version: "3.0"
           - python-version: "3.14"
             airflow-version: "3.1"
+        # Regression coverage for issue #679: AF 2.11 + apache-airflow-providers-standard 1.9.1.
+        include:
+          - python-version: "3.12"
+            airflow-version: "2.11"
+            providers-standard-version: "1.9.1"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+
+      - name: Compute hatch env name
+        id: hatch-env
+        env:
+          PY_VERSION: ${{ matrix.python-version }}
+          AF_VERSION: ${{ matrix.airflow-version }}
+          PROVIDERS_STANDARD_VERSION: ${{ matrix.providers-standard-version }}
+        run: |
+          suffix=""
+          if [ -n "$PROVIDERS_STANDARD_VERSION" ]; then
+            suffix="-$PROVIDERS_STANDARD_VERSION"
+          fi
+          echo "name=tests.py${PY_VERSION}-${AF_VERSION}${suffix}" >> "$GITHUB_OUTPUT"
+          echo "suffix=${suffix}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -94,7 +131,7 @@ jobs:
             ~/.cache/uv
             ~/.cache/pip
             .local/share/hatch/
-          key: unit-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('dagfactory/__init__.py') }}
+          key: unit-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}${{ steps.hatch-env.outputs.suffix }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('dagfactory/__init__.py') }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -107,18 +144,22 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install packages and dependencies
+        env:
+          HATCH_ENV_NAME: ${{ steps.hatch-env.outputs.name }}
         run: |
           uv pip install  --system "hatch>=1.14.2"
-          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }} run pip freeze
+          hatch -e "$HATCH_ENV_NAME" run pip freeze
 
       - name: Test DAG Factory against Airflow ${{ matrix.airflow-version }} and Python ${{ matrix.python-version }}
+        env:
+          HATCH_ENV_NAME: ${{ steps.hatch-env.outputs.name }}
         run: |
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}:test-cov
+          hatch run "$HATCH_ENV_NAME:test-cov"
 
       - name: Upload coverage to Github
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: coverage-unit-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}
+          name: coverage-unit-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}${{ steps.hatch-env.outputs.suffix }}
           path: .coverage
           include-hidden-files: true
 
