@@ -6,24 +6,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-### Added
-
-- Add `AIRFLOW__DAG_FACTORY__STRICT_MODE` (`dag_factory.strict_mode`, default `False`).
-  When enabled, raises `DagFactoryConfigException` for any DAG that fails to build, while still
-  registering all DAGs that built successfully. In folder-scan mode, a broken YAML file no longer
-  prevents other files from loading.
-
-### Internal
-
-- `_DagFactory.build_dags()` now returns `Tuple[Dict[str, DAG], Optional[Tuple[str, Exception]]]`
-  instead of `Dict[str, DAG]`. `_DagFactory` is a private class (underscore-prefixed, not exported
-  from `dagfactory/__init__.py`), so this is not part of the public API, but the change is flagged
-  here for anyone reaching into the private surface. The method also no longer raises on per-DAG
-  failures — failures are logged via `logging.exception` and the first failure is returned in the
-  second tuple element.
-
 ## [1.1.0] - 2026-05-07
 
 ### Breaking Changes
