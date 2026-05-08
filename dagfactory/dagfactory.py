@@ -287,10 +287,9 @@ class _DagFactory:
         dags, build_errors = self.build_dags()
         self.register_dags(dags, globals)
         if settings.strict_mode and build_errors:
-            details = "; ".join(f"{name}: {exc}" for name, exc in build_errors)
-            first_error = build_errors[0][1]
-            # Chain first failure as __cause__; remaining failures are in `details` and per-DAG logs.
-            raise DagFactoryConfigException(f"DAG build failed: {details}") from first_error
+            logging.debug("Strict mode collected %d DAG build errors: %s", len(build_errors), build_errors)
+            first_name, first_error = build_errors[0]
+            raise DagFactoryConfigException(f"DAG build failed: {first_name}: {first_error}") from first_error
 
 
 def _read_airflowignore(ignore_file: Path) -> List[str]:
@@ -565,7 +564,7 @@ def load_yaml_dags(
                 if any(file_name.endswith(suf) for suf in suffix):
                     candidate_dag_files.append(root_path / file_name)
 
-        strict_errors: List[Tuple[str, Exception]] = []
+        first_strict_error: Optional[Tuple[str, Exception]] = None
 
         for config_file_path in candidate_dag_files:
             if _should_ignore_file(config_file_path, dags_folder_path, ignore_patterns):
@@ -583,12 +582,11 @@ def load_yaml_dags(
                 factory._generate_dags(globals_dict)
             except Exception as e:  # pylint: disable=broad-except
                 logging.exception("Failed to load dag from %s", config_file_path)
-                if settings.strict_mode:
-                    strict_errors.append((config_file_abs_path, e))
+                if settings.strict_mode and first_strict_error is None:
+                    first_strict_error = (config_file_abs_path, e)
             else:
                 logging.info("DAG loaded: %s", config_file_path)
 
-        if strict_errors:
-            details = " | ".join(f"{path}: {exc}" for path, exc in strict_errors)
-            first_exc = strict_errors[0][1]
-            raise DagFactoryConfigException(details) from first_exc
+        if first_strict_error:
+            path, exc = first_strict_error
+            raise DagFactoryConfigException(f"Failed to load dag config from '{path}': {exc}") from exc
