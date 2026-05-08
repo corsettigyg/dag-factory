@@ -353,11 +353,12 @@ def test_generate_dags_with_removal_valid():
 
 
 def test_generate_dags_invalid_strict(monkeypatch):
-    """In strict mode a broken DAG config raises an exception."""
+    """In strict mode a broken DAG config raises DagFactoryConfigException."""
     from dagfactory import settings as dag_settings
+    from dagfactory.exceptions import DagFactoryConfigException
 
     monkeypatch.setattr(dag_settings, "strict_mode", True)
-    with pytest.raises(Exception):
+    with pytest.raises(DagFactoryConfigException, match="DAG build failed"):
         load_yaml_dags(
             globals_dict=globals(),
             config_filepath=INVALID_DAG_FACTORY,
@@ -1474,12 +1475,13 @@ def test_generate_dags_non_strict_swallows_errors():
 def test_generate_dags_strict_raises_and_registers_good():
     """In strict mode, good DAGs are registered AND an exception is raised."""
     from dagfactory import settings as dag_settings
+    from dagfactory.exceptions import DagFactoryConfigException
 
     factory = _DagFactory(config_dict=_MIXED_DAG_CONFIG)
     g: dict = {}
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(dag_settings, "strict_mode", True)
-        with pytest.raises(Exception, match="DAG build failed"):
+        with pytest.raises(DagFactoryConfigException, match="DAG build failed"):
             factory._generate_dags(g)
 
     assert "good_dag" in g
@@ -1488,6 +1490,7 @@ def test_generate_dags_strict_raises_and_registers_good():
 def test_load_yaml_dags_strict_mode_folder_scan_bad_file_raises(tmp_path, monkeypatch):
     """In folder-scan strict mode a broken YAML file raises after loading good files."""
     from dagfactory import settings as dag_settings
+    from dagfactory.exceptions import DagFactoryConfigException
 
     good_yaml = tmp_path / "good.yml"
     good_yaml.write_text(f"""
@@ -1506,7 +1509,7 @@ good_scan_dag:
 
     g: dict = {}
     monkeypatch.setattr(dag_settings, "strict_mode", True)
-    with pytest.raises(Exception):
+    with pytest.raises(DagFactoryConfigException):
         load_yaml_dags(globals_dict=g, dags_folder=str(tmp_path))
 
     assert "good_scan_dag" in g

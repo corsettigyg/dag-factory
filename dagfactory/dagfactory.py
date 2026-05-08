@@ -565,7 +565,7 @@ def load_yaml_dags(
                 if any(file_name.endswith(suf) for suf in suffix):
                     candidate_dag_files.append(root_path / file_name)
 
-        strict_errors: List[DagFactoryConfigException] = []
+        strict_errors: List[Tuple[str, Exception]] = []
 
         for config_file_path in candidate_dag_files:
             if _should_ignore_file(config_file_path, dags_folder_path, ignore_patterns):
@@ -584,11 +584,11 @@ def load_yaml_dags(
             except Exception as e:  # pylint: disable=broad-except
                 logging.exception("Failed to load dag from %s", config_file_path)
                 if settings.strict_mode:
-                    wrapped = DagFactoryConfigException(f"Failed to load dag config from '{config_file_abs_path}': {e}")
-                    wrapped.__cause__ = e
-                    strict_errors.append(wrapped)
+                    strict_errors.append((config_file_abs_path, e))
             else:
                 logging.info("DAG loaded: %s", config_file_path)
 
         if strict_errors:
-            raise DagFactoryConfigException(" | ".join(str(e) for e in strict_errors))
+            details = " | ".join(f"{path}: {exc}" for path, exc in strict_errors)
+            first_exc = strict_errors[0][1]
+            raise DagFactoryConfigException(details) from first_exc

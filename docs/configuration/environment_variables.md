@@ -19,9 +19,9 @@ directory of your DAG configurations. During DAG parsing, it will be resolved to
 
 ## Strict Mode
 
-By default DAG Factory silently skips DAGs that fail to build so other DAGs in the same YAML file or folder
-can still be loaded. Setting strict mode raises an exception for every problematic DAG while still registering
-all DAGs that built successfully.
+By default DAG Factory logs the error and skips DAGs that fail to build so other DAGs in the same YAML file
+or folder can still be loaded. Setting strict mode raises an exception for every problematic DAG while still
+registering all DAGs that built successfully.
 
 | Variable | Section | Key | Default |
 |---|---|---|---|
