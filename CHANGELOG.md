@@ -17,11 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
-- `_DagFactory.build_dags()` now returns `Tuple[Dict[str, DAG], List[Tuple[str, Exception]]]`
+- `_DagFactory.build_dags()` now returns `Tuple[Dict[str, DAG], Optional[Tuple[str, Exception]]]`
   instead of `Dict[str, DAG]`. `_DagFactory` is a private class (underscore-prefixed, not exported
   from `dagfactory/__init__.py`), so this is not part of the public API, but the change is flagged
   here for anyone reaching into the private surface. The method also no longer raises on per-DAG
-  failures — failures are returned in the second tuple element and logged via `logging.exception`.
+  failures — failures are logged via `logging.exception` and the first failure is returned in the
+  second tuple element.
 
 ## [1.1.0] - 2026-05-07
 

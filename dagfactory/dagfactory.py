@@ -218,12 +218,13 @@ class _DagFactory:
         """
         return self.config.get("default", {})
 
-    def build_dags(self) -> Tuple[Dict[str, DAG], List[Tuple[str, Exception]]]:
+    def build_dags(self) -> Tuple[Dict[str, DAG], Optional[Tuple[str, Exception]]]:
         """Build DAGs using the config file.
 
-        :returns: a tuple of ``(dags, build_errors)``. ``dags`` maps ``dag_id`` to the
-            successfully built :class:`DAG` instances; ``build_errors`` is a list of
-            ``(dag_name, exception)`` tuples for DAGs that failed to build.
+        :returns: a tuple of ``(dags, first_build_error)``. ``dags`` maps ``dag_id`` to the
+            successfully built :class:`DAG` instances; ``first_build_error`` is ``None`` if all
+            DAGs built successfully, otherwise a ``(dag_name, exception)`` tuple for the first
+            DAG that failed. Each individual failure is also logged via :func:`logging.exception`.
         """
         dag_configs: Dict[str, Dict[str, Any]] = self.get_dag_configs()
         global_default_args = self._global_default_args()
@@ -240,7 +241,7 @@ class _DagFactory:
         else:
             dag_level_args = {}
 
-        build_errors: List[Tuple[str, Exception]] = []
+        first_build_error = None
 
         for dag_name, dag_config in dag_configs.items():
             try:
@@ -261,9 +262,10 @@ class _DagFactory:
             except Exception as exc:  # pylint: disable=broad-except
                 config_origin = self.config_file_path or "<config_dict>"
                 logging.exception("Failed to build DAG '%s' from '%s'", dag_name, config_origin)
-                build_errors.append((dag_name, exc))
+                if not first_build_error:
+                    first_build_error = (dag_name, exc)
 
-        return dags, build_errors
+        return dags, first_build_error
 
     # pylint: disable=redefined-builtin
     @staticmethod
@@ -284,11 +286,11 @@ class _DagFactory:
         :param globals: The globals() from the file used to generate DAGs. The dag_id
             must be passed into globals() for Airflow to import
         """
-        dags, build_errors = self.build_dags()
+        dags, first_build_error = self.build_dags()
         self.register_dags(dags, globals)
-        if settings.strict_mode and build_errors:
-            first_name, first_error = build_errors[0]
-            raise DagFactoryConfigException(f"DAG build failed: {first_name}: {first_error}") from first_error
+        if settings.strict_mode and first_build_error:
+            name, exc = first_build_error
+            raise DagFactoryConfigException(f"DAG build failed: {name}: {exc}") from exc
 
 
 def _read_airflowignore(ignore_file: Path) -> List[str]:

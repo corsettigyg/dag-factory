@@ -1440,23 +1440,23 @@ _MIXED_DAG_CONFIG = {**_GOOD_DAG_CONFIG, **_BAD_DAG_CONFIG}
 
 
 def test_build_dags_returns_tuple():
-    """build_dags always returns (dags_dict, errors_list)."""
+    """build_dags always returns (dags_dict, first_build_error)."""
     factory = _DagFactory(config_dict=_GOOD_DAG_CONFIG)
     result = factory.build_dags()
     assert isinstance(result, tuple) and len(result) == 2
-    dags, errors = result
+    dags, first_error = result
     assert "good_dag" in dags
-    assert errors == []
+    assert first_error is None
 
 
 def test_build_dags_partial_failure_returns_good_dags():
     """A broken DAG does not prevent valid ones from being returned."""
     factory = _DagFactory(config_dict=_MIXED_DAG_CONFIG)
-    dags, errors = factory.build_dags()
+    dags, first_error = factory.build_dags()
     assert "good_dag" in dags
-    assert len(errors) == 1
-    assert errors[0][0] == "bad_dag"
-    assert isinstance(errors[0][1], Exception)
+    assert first_error is not None
+    assert first_error[0] == "bad_dag"
+    assert isinstance(first_error[1], Exception)
 
 
 def test_generate_dags_non_strict_swallows_errors():
