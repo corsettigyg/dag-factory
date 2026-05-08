@@ -582,7 +582,7 @@ def load_yaml_dags(
                 factory._generate_dags(globals_dict)
             except Exception as e:  # pylint: disable=broad-except
                 logging.exception("Failed to load dag from %s", config_file_path)
-                if settings.strict_mode and first_strict_error is None:
+                if settings.strict_mode and not first_strict_error:
                     first_strict_error = (config_file_abs_path, e)
             else:
                 logging.info("DAG loaded: %s", config_file_path)
