@@ -287,7 +287,6 @@ class _DagFactory:
         dags, build_errors = self.build_dags()
         self.register_dags(dags, globals)
         if settings.strict_mode and build_errors:
-            logging.debug("Strict mode collected %d DAG build errors: %s", len(build_errors), build_errors)
             first_name, first_error = build_errors[0]
             raise DagFactoryConfigException(f"DAG build failed: {first_name}: {first_error}") from first_error
 
