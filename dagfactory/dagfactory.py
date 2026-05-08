@@ -564,7 +564,7 @@ def load_yaml_dags(
                 if any(file_name.endswith(suf) for suf in suffix):
                     candidate_dag_files.append(root_path / file_name)
 
-        first_strict_error: Optional[Tuple[str, Exception]] = None
+        first_strict_error = None
 
         for config_file_path in candidate_dag_files:
             if _should_ignore_file(config_file_path, dags_folder_path, ignore_patterns):
